@@ -1,14 +1,28 @@
+@import "tailwindcss";
 @import '@fontsource/inter/400.css';
 @import '@fontsource/inter/500.css';
 @import '@fontsource/inter/600.css';
 @import '@fontsource/inter/700.css';
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+
+@theme {
+  --color-navy: #0F172A;
+  --color-navy-50: #E8EBF3;
+  --color-navy-100: #C5CCDF;
+  --color-navy-200: #8E9DBF;
+  --color-navy-300: #57709F;
+  --color-navy-400: #2E4E85;
+  --color-navy-500: #0F172A;
+  --color-navy-600: #0B1222;
+  --color-navy-700: #080D19;
+  --color-navy-800: #050910;
+  --color-navy-900: #020408;
+
+  --font-family-sans: 'Inter', system-ui, sans-serif;
+}
 
 @layer base {
   html {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: var(--font-family-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     scroll-behavior: smooth;
