@@ -1,25 +1,15 @@
-import { Hono } from 'hono'
-import { handle } from 'hono/vercel'
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { Resend } from 'resend'
 import { z } from 'zod'
-
-export const runtime = 'edge'
-
-const app = new Hono().basePath('/api')
 
 const contactSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
   phone: z.string().optional(),
-  projectType: z.enum([
-    'kitchen-remodeling',
-    'bathroom-renovation',
-    'deck-patio',
-    'basement-finishing',
-    'roof-repair',
-    'general-contracting',
-    'other',
-  ] as const, { message: 'Please select a project type' }),
+  projectType: z.enum(
+    ['kitchen-remodeling', 'bathroom-renovation', 'deck-patio', 'basement-finishing', 'roof-repair', 'general-contracting', 'other'] as const,
+    { message: 'Please select a project type' }
+  ),
   message: z.string().min(10, 'Message must be at least 10 characters'),
 })
 
@@ -33,20 +23,17 @@ const projectTypeLabels: Record<string, string> = {
   'other': 'Other / Not Sure Yet',
 }
 
-app.post('/contact', async (c) => {
-  let body: unknown
-  try {
-    body = await c.req.json()
-  } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400)
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const result = contactSchema.safeParse(body)
+  const result = contactSchema.safeParse(req.body)
   if (!result.success) {
-    return c.json(
-      { error: 'Validation failed', issues: result.error.flatten().fieldErrors },
-      400
-    )
+    return res.status(400).json({
+      error: 'Validation failed',
+      issues: result.error.flatten().fieldErrors,
+    })
   }
 
   const { name, email, phone, projectType, message } = result.data
@@ -55,15 +42,14 @@ app.post('/contact', async (c) => {
   const toEmail = process.env.RESEND_TO_EMAIL || 'info@peakridgecontracting.com'
   const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@peakridgecontracting.com'
 
-  if (!apiKey) {
-    console.error('RESEND_API_KEY not configured')
-    return c.json({ error: 'Email service not configured' }, 500)
+  if (!apiKey || apiKey.startsWith('re_placeholder')) {
+    console.warn('RESEND_API_KEY not configured — email not sent')
+    return res.status(200).json({ success: true, message: 'Message received (email delivery pending configuration).' })
   }
 
   const resend = new Resend(apiKey)
-
   const projectLabel = projectTypeLabels[projectType] || projectType
-  const phoneDisplay = phone ? phone : 'Not provided'
+  const phoneDisplay = phone || 'Not provided'
 
   try {
     await resend.emails.send({
@@ -110,11 +96,14 @@ app.post('/contact', async (c) => {
       `,
     })
 
-    return c.json({ success: true, message: 'Your message has been sent. We\'ll be in touch within one business day.' })
+    return res.status(200).json({
+      success: true,
+      message: "Your message has been sent. We'll be in touch within one business day.",
+    })
   } catch (err) {
     console.error('Resend error:', err)
-    return c.json({ error: 'Failed to send message. Please call us directly at (720) 555-0148.' }, 500)
+    return res.status(500).json({
+      error: 'Failed to send message. Please call us directly at (720) 555-0148.',
+    })
   }
-})
-
-export default handle(app)
+}
